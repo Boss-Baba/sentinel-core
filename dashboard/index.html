@@ -1,1 +1,190 @@
-404: Not Found
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sentinel Core Dashboard</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --text: #00ff88;
+      --border: #00ff8844;
+      --online: #00ff88;
+      --offline: #ff0000;
+      --header: #001100;
+      --th-bg: #001100;
+      --tr-critical: #ff000011;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Courier New', monospace;
+      padding: 2rem;
+    }
+    header {
+      background: var(--header);
+      padding: 1rem 2rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin-bottom: 1.5rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      text-shadow: 0 0 5px var(--text);
+    }
+    .status {
+      display: flex;
+      gap: 1rem;
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+    }
+    .status span {
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .online {
+      background: rgba(0, 255, 136, 0.15);
+      color: var(--online);
+    }
+    .offline {
+      background: rgba(255, 0, 0, 0.15);
+      color: var(--offline);
+    }
+    main h2 {
+      margin: 1.5rem 0;
+      color: var(--text);
+      text-shadow: 0 0 3px var(--text);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--bg);
+    }
+    th, td {
+      text-align: left;
+      padding: 0.8rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      background: var(--th-bg);
+      color: var(--text);
+      font-weight: bold;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    tr.CRITICAL {
+      background: var(--tr-critical);
+      border-left: 4px solid var(--offline);
+    }
+    .no-threats {
+      color: #00ff8888;
+      font-style: italic;
+      text-align: center;
+      padding: 1.5rem;
+    }
+    footer {
+      margin-top: 2rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #00ff8888;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🛡️ Sentinel Core Dashboard</h1>
+    <div class="status">
+      <span id="ai-status">AI Brain: offline</span>
+      <span id="resp-status">Response: offline</span>
+    </div>
+  </header>
+
+  <main>
+    <h2>🚨 Live Threat Feed</h2>
+    <table id="threats">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Threat</th>
+          <th>Confidence</th>
+          <th>Action</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </main>
+
+  <footer>
+    <p>📡 Connected to AI Brain on :8080 | Autonomous Response Active</p>
+  </footer>
+
+  <script>
+    const SERVER = '31.25.235.33';
+
+    function update() {
+      fetch(\`http://\${SERVER}:8080/api/v1/threats\`)
+        .then(r => r.ok ? r.json() : { threats: [] })
+        .then(data => {
+          const tbody = document.querySelector('#threats tbody');
+          tbody.innerHTML = '';
+          const threats = Array.isArray(data.threats) ? data.threats : [];
+
+          if (threats.length === 0) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td colspan="5" class="no-threats">No active threats detected</td>';
+            tbody.appendChild(tr);
+          } else {
+            threats.slice(-10).reverse().forEach(t => {
+              const tr = document.createElement('tr');
+              tr.className = t.severity === 'CRITICAL' ? 'CRITICAL' : '';
+              tr.innerHTML = \`
+                <td>\${t.alert_id}</td>
+                <td>\${t.threat_type}</td>
+                <td>\${(t.confidence * 100).toFixed(0)}%</td>
+                <td><strong>\${t.action_recommended || t.action || 'MONITOR'}</strong></td>
+                <td>\${new Date(t.timestamp).toLocaleTimeString()}</td>
+              \`;
+              tbody.appendChild(tr);
+            });
+          }
+          document.getElementById('ai-status').textContent = 'AI Brain: online';
+          document.getElementById('ai-status').className = 'online';
+        })
+        .catch(() => {
+          document.getElementById('ai-status').textContent = 'AI Brain: offline';
+          document.getElementById('ai-status').className = 'offline';
+        });
+
+      fetch(\`http://\${SERVER}:9000/api/v1/response\`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'HEALTH_CHECK' }),
+        mode: 'cors'
+      })
+        .then(r => {
+          if (r.ok || r.status === 400) {
+            document.getElementById('resp-status').textContent = 'Response: online';
+            document.getElementById('resp-status').className = 'online';
+          } else {
+            throw new Error('Not OK');
+          }
+        })
+        .catch(() => {
+          document.getElementById('resp-status').textContent = 'Response: offline';
+          document.getElementById('resp-status').className = 'offline';
+        });
+    }
+
+    setInterval(update, 3000);
+    update();
+  </script>
+</body>
+</html>
